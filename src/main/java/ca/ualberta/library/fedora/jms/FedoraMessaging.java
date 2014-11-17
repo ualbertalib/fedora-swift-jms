@@ -3,14 +3,13 @@ package ca.ualberta.library.fedora.jms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.*;
-
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpState;
 import org.apache.commons.httpclient.methods.PostMethod;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
@@ -47,10 +46,9 @@ import org.fcrepo.server.management.FedoraAPIMMTOM;
 import org.fcrepo.server.access.FedoraAPIAMTOM;
 import org.fcrepo.server.types.mtom.gen.MIMETypedStream;
 import org.fcrepo.server.types.gen.DatastreamDef;
+import org.fcrepo.server.types.gen.RepositoryInfo;
 import org.fcrepo.common.Constants;
-
 import org.jclouds.openstack.swift.domain.MutableObjectInfoWithMetadata;
-
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -114,6 +112,8 @@ public class FedoraMessaging implements MessagingListener {
 		  	String password = clientProperties.getProperty("password");
 			FedoraClient fedoraClient = new FedoraClient(baseURL, "fedoraAdmin", "fedoraAdmin");
 			APIA = fedoraClient.getAPIAMTOM();
+			RepositoryInfo repositoryInfo = APIA.describeRepository();
+			String version = repositoryInfo.getRepositoryVersion();
 			APIM = fedoraClient.getAPIMMTOM();
 		}	  
 	  	catch (Exception e) {
@@ -206,7 +206,7 @@ public class FedoraMessaging implements MessagingListener {
 
  	public void getFile(String id) {
 		
-//   	 	JCloudSwift jcloud = new JCloudSwift();
+// 	 	JCloudSwift jcloud = new JCloudSwift();
    	 	
 		List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
 		for (DatastreamDef datastreamDef : datastreamList) {
@@ -218,15 +218,15 @@ public class FedoraMessaging implements MessagingListener {
 				DataHandler data = stream.getStream();
 				InputStream inputStream = data.getInputStream();
 				
-	    		id = id.substring(id.lastIndexOf(":")+1);
+	    		String fileName = id.substring(id.lastIndexOf(":")+1);
 	    		
 				MessageDigest digest = createTempFile(inputStream, id);
 				
 	            String fileChecksum = checksumBytesToString(digest.digest());
 	            
-//	            String noid = mintNoid();
+	            String noid = mintNoid();
 				
-				File upload = new File("tmp" + id);
+				File upload = new File("tmp/" + fileName);
 				
 /*    			if (jcloud.uploadObject(swiftContainer + noid, upload)) {
     				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + noid, upload.getName());
@@ -246,15 +246,17 @@ public class FedoraMessaging implements MessagingListener {
     				
     				log.info("Object copied: " + upload.getName());
     			}*/
+	            
+	            inputStream.close();
 	        }
-			catch (IOException e) {
+			catch (Exception e) {
 				e.printStackTrace();
 			}
 		}	
 		        	
 	}	
 
-    private MessageDigest createTempFile(InputStream inputStream, String id) {
+    public MessageDigest createTempFile(InputStream inputStream, String id) {
        	
     	MessageDigest digest = null;
     	
@@ -294,7 +296,7 @@ public class FedoraMessaging implements MessagingListener {
     	return digest;
     }
     
-    private String mintNoid() {
+    public String mintNoid() {
        	
     	HttpMethod method = new PostMethod(noidURL);
     	
@@ -331,7 +333,7 @@ public class FedoraMessaging implements MessagingListener {
         return numRead;
     }
     
-    private static String checksumBytesToString(byte[] digestBytes) {
+    public static String checksumBytesToString(byte[] digestBytes) {
         
     	StringBuffer hexString = new StringBuffer();
         for (int i=0; i<digestBytes.length; i++) {
