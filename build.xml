@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="fedora-swift-jms" default="compile">
+
+<property file="build.properties"/>
+
+<property name="lib" value="lib" />
+<property name="src.dir" location="src/main/java"/>
+<property name="src.test" location="src/test/java"/>
+<property name="test.dir" location="test"/>
+<property name="target.dir" location="target"/>
+<property name="target.classes.java.dir" location="${target.dir}/classes/java"/>
+<property name="target.classes.test.dir" location="${target.dir}/classes/test"/>
+<property name="target.report.dir" location="${target.dir}/reports/"/>
+
+<buildnumber/>
+
+<path id="build.classpath">
+	<fileset dir="lib">
+		<include name="**/*.jar"/>
+	</fileset>
+	<pathelement location="target/classes" />
+	<pathelement location="src" />
+</path>
+
+<!-- compile sources -->
+<target name="compile">
+	<mkdir dir="${target.classes.java.dir}"/>
+	<javac destdir="${target.classes.java.dir}" encoding="UTF-8">
+		<src path="${src.dir}"/>
+		<classpath>
+			<pathelement location="${target.classes.java.dir}"/>
+			<path refid="build.classpath"/>
+		</classpath>
+	</javac>
+</target>
+
+<target name="compile.test" depends="compile">
+	<mkdir dir="${target.classes.test.dir}"/>
+	<javac destdir="${target.classes.test.dir}" encoding="UTF-8">
+		<src path="${src.test}"/>
+		<classpath>
+			<pathelement location="${target.classes.java.dir}"/>
+			<pathelement location="${target.classes.test.dir}"/>
+			<path refid="build.classpath"/>
+		</classpath>
+	</javac>
+</target>
+
+<!-- build archive -->
+<target name="archive" depends="compile">
+	<jar destfile="target/dist/fedora-swift-jms.jar" basedir="target/build/classes" manifest="manifest.txt"/>
+</target>
+
+<!-- delete builds -->
+<target name="clean">
+	<delete dir="${target.dir}"/>
+</target>
+
+<target name="fedora-messaging" description="Run fedora messaging">
+	<java classname="ca.ualberta.library.fedora.jms.FedoraMessaging" classpathref="build.classpath">
+		<sysproperty key="logname" value="/logs/fedora-swift-jms.log"/>
+	</java>
+</target>	
+
+<target name="test" depends="compile"> 
+	<mkdir dir="${target.report.dir}"/>
+	<junit printsummary="on" haltonerror="yes" haltonfailure="yes" fork="true"> 
+		<sysproperty key="logname" value="logs/fedora-swift-jms.log"/>
+		<classpath> 
+			<pathelement location="${target.classes.java.dir}"/>
+			<pathelement location="${target.classes.test.dir}"/>
+			<pathelement location="${src.dir}"/> 
+			<path refid="build.classpath"/>
+		</classpath> 
+
+      		<formatter type="plain"/>
+      		<formatter type="xml"/>
+
+       		<batchtest todir="${target.report.dir}">
+        		<fileset dir="${src.test}">
+          			<include name="**/*Test*.java"/>
+        		</fileset>
+      		</batchtest>
+	</junit> 
+</target>
+
+</project>
+	
