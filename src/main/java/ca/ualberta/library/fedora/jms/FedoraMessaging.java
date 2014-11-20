@@ -45,6 +45,8 @@ import org.fcrepo.server.errors.MessagingException;
 import org.fcrepo.server.management.FedoraAPIMMTOM;
 import org.fcrepo.server.access.FedoraAPIAMTOM;
 import org.fcrepo.server.types.mtom.gen.MIMETypedStream;
+import org.fcrepo.server.types.gen.Datastream;
+import org.fcrepo.server.types.gen.DatastreamControlGroup;
 import org.fcrepo.server.types.gen.DatastreamDef;
 import org.fcrepo.server.types.gen.RepositoryInfo;
 import org.fcrepo.common.Constants;
@@ -181,7 +183,7 @@ public class FedoraMessaging implements MessagingListener {
 			    	}
 			    	
 			    	if (idText != null) {
-				    	getFile(idText);
+				    	getFedoraObject(idText);
 			    	}
 	    		}
 	    	}	
@@ -204,58 +206,81 @@ public class FedoraMessaging implements MessagingListener {
         log.info("Message received: " + messageText + " from client " + clientId);
 	}
 
- 	public void getFile(String id) {
+ 	public void getFedoraObject(String id) {
 		
-// 	 	JCloudSwift jcloud = new JCloudSwift();
-   	 	
-		List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
-		for (DatastreamDef datastreamDef : datastreamList) {
-			
-			try {
-				String datastreamID = datastreamDef.getID();
-				
-				MIMETypedStream stream = APIA.getDatastreamDissemination(id, datastreamID, null);
-				DataHandler data = stream.getStream();
-				InputStream inputStream = data.getInputStream();
-				
-	    		String fileName = id.substring(id.lastIndexOf(":")+1);
-	    		
-				MessageDigest digest = createTempFile(inputStream, id);
-				
-	            String fileChecksum = checksumBytesToString(digest.digest());
-	            
-	            String noid = mintNoid();
-				
-				File upload = new File("tmp/" + fileName);
-				
-/*    			if (jcloud.uploadObject(swiftContainer + noid, upload)) {
-    				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + noid, upload.getName());
-    			
-	                String fileChecksum = checksumBytesToString(digest.digest());
-	                
-    				String retrievedChecksum = checksumBytesToString(metadata.getHash());
+ 		try {
+    		String fileName = id.substring(id.lastIndexOf(":")+1);
     		
-    				if (!retrievedChecksum.equals(fileChecksum)) {
-    					log.error("Checksums not equal for: " + upload.getName());
-    				}
-    				
-    				long retrievedLength = metadata.getBytes();
-    				if (retrievedLength != upload.length()) {
-    					log.error("File size does not match for: " + upload.getName());
-    				}
-    				
-    				log.info("Object copied: " + upload.getName());
-    			}*/
-	            
-	            inputStream.close();
-	        }
-			catch (Exception e) {
-				e.printStackTrace();
+ 			DataHandler object = APIM.getObjectXML(id);
+			InputStream inputObject = object.getInputStream();
+	 		
+			MessageDigest digestObject = createTempFile(inputObject, fileName);
+			
+            String fileChecksum = checksumBytesToString(digestObject.digest());
+            
+            String noid = mintNoid();
+            
+			File uploadObject = new File("tmp/" + fileName);
+			
+//			writeFiles(noid, uploadObject, fileChecksum);
+			
+			List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
+			for (DatastreamDef datastreamDef : datastreamList) {
+				String datastreamID = datastreamDef.getID();
+				Datastream datastream = APIM.getDatastream(id, datastreamID, null);
+				DatastreamControlGroup controlGroup = datastream.getControlGroup();
+				String controlGroupType = controlGroup.name();
+				String versionID = datastream.getVersionID();
+				
+				if (controlGroupType.equals("M")) {
+					MIMETypedStream stream = APIA.getDatastreamDissemination(id, datastreamID, null);
+					DataHandler data = stream.getStream();
+					InputStream inputData = data.getInputStream();
+					
+					String fullFilename = fileName + "+" + datastreamID + "+" + versionID;
+					MessageDigest digestData = createTempFile(inputData, fullFilename);
+					
+		            fileChecksum = checksumBytesToString(digestData.digest());
+		            
+					File upload = new File("tmp/" + fullFilename);
+					
+					writeFiles(noid, uploadObject, fileChecksum);
+				}	
 			}
-		}	
+ 		}
+ 		catch (Exception e) {
+ 			e.printStackTrace();
+ 		}
 		        	
 	}	
 
+ 	public void writeFiles(String noid, File upload, String fileChecksum) {
+ 		
+// 	 	JCloudSwift jcloud = new JCloudSwift();
+   	 	
+ 		try {
+/*			if (jcloud.uploadObject(swiftContainer + noid, upload)) {
+				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + noid, upload.getName());
+		
+				String retrievedChecksum = checksumBytesToString(metadata.getHash());
+	
+				if (!retrievedChecksum.equals(fileChecksum)) {
+					log.error("Checksums not equal for: " + upload.getName());
+				}
+				
+				long retrievedLength = metadata.getBytes();
+				if (retrievedLength != upload.length()) {
+					log.error("File size does not match for: " + upload.getName());
+				}
+				
+				log.info("Object copied: " + upload.getName());
+			}*/
+ 		}
+ 		catch (Exception e) {
+ 			e.printStackTrace();
+ 		}
+	}
+ 	
     public MessageDigest createTempFile(InputStream inputStream, String id) {
        	
     	MessageDigest digest = null;

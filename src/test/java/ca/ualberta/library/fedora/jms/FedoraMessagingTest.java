@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Properties;
 
 import javax.activation.DataHandler;
+import javax.activation.DataSource;
+import javax.activation.FileDataSource;
 import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.Message;
@@ -28,6 +30,7 @@ import javax.jms.Connection;
 import javax.jms.Session;
 import javax.naming.Context;
 import javax.xml.parsers.*;
+import javax.xml.rpc.ServiceException;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
@@ -35,8 +38,6 @@ import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.IOUtils;
 import org.apache.activemq.*;
-//import org.apache.commons.logging.Log;
-//import org.apache.commons.logging.LogFactory;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -46,13 +47,18 @@ import org.fcrepo.client.messaging.JmsMessagingClient;
 import org.fcrepo.client.messaging.MessagingClient;
 import org.fcrepo.client.messaging.MessagingListener;
 import org.fcrepo.server.access.FedoraAPIAMTOM;
+import org.fcrepo.server.errors.GeneralException;
 import org.fcrepo.server.access.FedoraAPIA;
 import org.fcrepo.server.errors.MessagingException;
 import org.fcrepo.server.management.FedoraAPIMMTOM;
 import org.fcrepo.server.messaging.JMSManager;
+import org.fcrepo.server.types.gen.Datastream;
+import org.fcrepo.server.types.gen.DatastreamControlGroup;
 import org.fcrepo.server.types.gen.DatastreamDef;
 import org.fcrepo.server.types.gen.RepositoryInfo;
 import org.fcrepo.server.types.mtom.gen.MIMETypedStream;
+import org.fcrepo.server.utilities.TypeUtility;
+import org.fcrepo.common.Constants;
 import org.jclouds.openstack.swift.domain.MutableObjectInfoWithMetadata;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -113,7 +119,7 @@ public class FedoraMessagingTest implements MessagingListener {
 		destination = session.createTopic("Test.Topic");
 		
         try {
-	        InputStream inputStream = new FileInputStream("test.xml");
+	        InputStream inputStream = new FileInputStream("src/test/files/message.xml");
 	        document = reader.read(inputStream);
 	        doc = document.asXML();
         }
@@ -123,7 +129,7 @@ public class FedoraMessagingTest implements MessagingListener {
         catch (FileNotFoundException e) {
         	e.getMessage();
         }
-	    
+        
    }
 	
 	@AfterClass
@@ -209,7 +215,10 @@ public class FedoraMessagingTest implements MessagingListener {
 			version = repositoryInfo.getRepositoryVersion();
 			assertEquals(version, "3.7.0");
 		}	  
-	  	catch (Exception e) {
+	  	catch (IOException e) {
+		  	e.printStackTrace();
+	  	}
+	  	catch (ServiceException e) {
 		  	e.printStackTrace();
 	  	}
 	  	
@@ -224,7 +233,7 @@ public class FedoraMessagingTest implements MessagingListener {
 		  	e.printStackTrace();
 	  	}
     	
-    	Properties noidProperties = new Properties();
+ /*   	Properties noidProperties = new Properties();
 	  	try {
 	  		noidProperties.load(new FileInputStream("noid.properties"));
 		  
@@ -238,7 +247,7 @@ public class FedoraMessagingTest implements MessagingListener {
 	  	}	  
 	  	catch (IOException e) {
 		  	e.printStackTrace();
-	  	}
+	  	}*/
    }
     
    @Test
@@ -260,7 +269,7 @@ public class FedoraMessagingTest implements MessagingListener {
    @Test
    public void testOnMessage() throws JMSException {
 	
-	  Message message = session.createTextMessage(doc);
+	   Message message = session.createTextMessage(doc);
 		
 	   Document document = null;
        SAXReader reader = new SAXReader();
@@ -303,58 +312,103 @@ public class FedoraMessagingTest implements MessagingListener {
 	}
 
     @Test
- 	public void testGetFile() {
+ 	public void testGetFedoraObject() {
+		
+    	String id = null;
+    	String noid = "test";
     	
     	FedoraMessaging fedoraMessaging = new FedoraMessaging();
     	
-    	String id = "changeme:1";
-    	String noid = "test";
-		
-// 		JCloudSwift jcloud = new JCloudSwift();
-//      assertNotNull(jcloud);
-    	
-   	 	List <DatastreamDef> testdatastreamList = null;
-    	
-		List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
-		
-		for (DatastreamDef datastreamDef : datastreamList) {
-			
-			try {
-				String datastreamID = datastreamDef.getID();
-				
-				MIMETypedStream stream = APIA.getDatastreamDissemination(id, datastreamID, null);
-				DataHandler data = stream.getStream();
-				InputStream inputStream = data.getInputStream();
-				
-	    		String fileName = id.substring(id.lastIndexOf(":")+1);
-	    		assertEquals(fileName, "1");
-	    		
-	    		MessageDigest digest = fedoraMessaging.createTempFile(inputStream, id);
-				
-				File upload = new File("tmp/" + fileName);
-				
-/*    			if (jcloud.uploadObject(swiftContainer + noid, upload)) {
-    				assertTrue(jcloud.objectExist(swiftContainer + noid, upload.getName()));
-    				
-    				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + noid, upload.getName());
-    			
-	                String fileChecksum = fedoraMessaging.checksumBytesToString(digest.digest());
-	                
-    				String retrievedChecksum = fedoraMessaging.checksumBytesToString(metadata.getHash());
+		try {
+        	InputStream is = new FileInputStream(new File("src/test/files/ingest.xml"));
+        	byte[] bytes = IOUtils.toByteArray(is);
+        	id = APIM.ingest(TypeUtility.convertBytesToDataHandler(bytes), Constants.FOXML1_1.uri, "ingesting new foxml object");
+        }
+        catch (IOException e) {
+        	e.getMessage();
+        }
+        
+ 		try {
+    		String fileName = id.substring(id.lastIndexOf(":")+1);
     		
-    				assertEquals(retrievedChecksum, fileChecksum);
-    				
-    				long retrievedLength = metadata.getBytes();
-    				assertEquals(retrievedLength, upload.length());
-    			}*/
-	        }
-			catch (IOException e) {
-				e.printStackTrace();
+ 			DataHandler object = APIM.getObjectXML(id);
+ 			String contentType = object.getContentType();
+ 			assertEquals(contentType, "text/xml");
+ 			
+			InputStream inputObject = object.getInputStream();
+	 		
+			MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, fileName);
+			
+            String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
+            
+			File uploadObject = new File("tmp/" + fileName);
+			
+			List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
+			for (DatastreamDef datastreamDef : datastreamList) {
+				String datastreamID = datastreamDef.getID();
+				Datastream datastream = APIM.getDatastream(id, datastreamID, null);
+				DatastreamControlGroup controlGroup = datastream.getControlGroup();
+				String controlGroupType = controlGroup.name();
+				String versionID = datastream.getVersionID();
+				
+				if (controlGroupType.equals("X")) {
+					MIMETypedStream stream = APIA.getDatastreamDissemination(id, datastreamID, null);
+					DataHandler data = stream.getStream();
+					InputStream inputData = data.getInputStream();
+					
+					String fullFilename = fileName + "+" + datastreamID + "+" + versionID;
+					MessageDigest digestData = fedoraMessaging.createTempFile(inputData, fullFilename);
+					
+		            fileChecksum = fedoraMessaging.checksumBytesToString(digestData.digest());
+		            
+					File upload = new File("tmp/" + fullFilename);
+					
+//					writeFiles(noid, uploadObject, fileChecksum);
+				}	
 			}
-		}	
+ 		}
+ 		catch (Exception e) {
+ 			e.printStackTrace();
+ 		}
 		        	
 	}	
 
+    @Test
+ 	public void writeFiles() {
+	 	
+ 		String noid = "test";
+ 		
+    	FedoraMessaging fedoraMessaging = new FedoraMessaging();
+    	
+ 		try {
+	    	InputStream inputObject = new FileInputStream(new File("src/test/files/ingest.xml"));
+	    	
+			MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, "ingest.xml");
+			
+	        String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
+	        
+			File upload = new File("src/test/files/ingest.xml");
+			
+	 	 	JCloudSwift jcloud = new JCloudSwift();
+	 		assertNotNull(jcloud);
+	   	 	
+	 		    jcloud.uploadObject("era/test", upload);
+	 		    
+				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo("era/test", upload.getName());
+		
+				String retrievedChecksum = fedoraMessaging.checksumBytesToString(metadata.getHash());
+	            
+				assertEquals(retrievedChecksum, fileChecksum);
+				
+				long retrievedLength = metadata.getBytes();
+				assertEquals(retrievedLength, upload.length());
+			
+ 		}
+ 		catch (Exception e) {
+ 			e.printStackTrace();
+ 		}
+	}
+ 	
     @Test
     public void testMintNoid() {
        	
