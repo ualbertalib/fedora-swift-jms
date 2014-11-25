@@ -2,25 +2,17 @@ package ca.ualberta.library.fedora.jms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.*;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpState;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.TextMessage;
 import javax.naming.Context;
-import javax.swing.event.MenuEvent;
-import javax.swing.event.MenuListener;
 import javax.activation.DataHandler;
-import javax.xml.rpc.ServiceException;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,11 +21,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.List;
-import java.net.URL;
 import java.security.NoSuchAlgorithmException;
 
 import org.fcrepo.client.messaging.JmsMessagingClient;
@@ -48,15 +38,11 @@ import org.fcrepo.server.types.mtom.gen.MIMETypedStream;
 import org.fcrepo.server.types.gen.Datastream;
 import org.fcrepo.server.types.gen.DatastreamControlGroup;
 import org.fcrepo.server.types.gen.DatastreamDef;
-import org.fcrepo.server.types.gen.RepositoryInfo;
-import org.fcrepo.common.Constants;
 import org.jclouds.openstack.swift.domain.MutableObjectInfoWithMetadata;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
-import org.dom4j.Element;
-import org.dom4j.Node;
 
 import ca.ualberta.library.jclouds.JCloudSwift;
 
@@ -66,6 +52,7 @@ public class FedoraMessaging implements MessagingListener {
     private static FedoraAPIAMTOM APIA = null;
     private static FedoraAPIMMTOM APIM = null;
     private String swiftContainer = null;
+    private String tmpDirectory = null;
     private String noidURL = null;
     private HttpClient client;
 	
@@ -76,7 +63,7 @@ public class FedoraMessaging implements MessagingListener {
 			messaging.start();
 		}
 		catch (MessagingException e) {
-			e.getMessage();
+	  		log.error(e.getMessage());
 		}
 	}
 	
@@ -102,7 +89,7 @@ public class FedoraMessaging implements MessagingListener {
 	        messagingClient.start();
 	  	}	  
 	  	catch (IOException e) {
-		  	e.printStackTrace();
+	  		log.error(e.getMessage());
 	  	}
     	
     	Properties clientProperties = new Properties();
@@ -112,14 +99,13 @@ public class FedoraMessaging implements MessagingListener {
 		  	String baseURL = clientProperties.getProperty("baseURL");
 		  	String username = clientProperties.getProperty("username");
 		  	String password = clientProperties.getProperty("password");
-			FedoraClient fedoraClient = new FedoraClient(baseURL, "fedoraAdmin", "fedoraAdmin");
+		  	tmpDirectory = clientProperties.getProperty("tmpDirectory");
+			FedoraClient fedoraClient = new FedoraClient(baseURL, username, password);
 			APIA = fedoraClient.getAPIAMTOM();
-			RepositoryInfo repositoryInfo = APIA.describeRepository();
-			String version = repositoryInfo.getRepositoryVersion();
 			APIM = fedoraClient.getAPIMMTOM();
 		}	  
 	  	catch (Exception e) {
-		  	e.printStackTrace();
+	  		log.error(e.getMessage());
 	  	}
 	  	
     	Properties jcloudProperties = new Properties();
@@ -129,7 +115,7 @@ public class FedoraMessaging implements MessagingListener {
 		  	swiftContainer = jcloudProperties.getProperty("container");
 	  	}	  
 	  	catch (IOException e) {
-		  	e.printStackTrace();
+	  		log.error(e.getMessage());
 	  	}
     	
     	Properties noidProperties = new Properties();
@@ -142,7 +128,7 @@ public class FedoraMessaging implements MessagingListener {
 	    	client.getHttpConnectionManager().getParams().setConnectionTimeout(50000);
 	  	}	  
 	  	catch (IOException e) {
-		  	e.printStackTrace();
+	  		log.error(e.getMessage());
 	  	}
    }
     
@@ -161,7 +147,6 @@ public class FedoraMessaging implements MessagingListener {
             
             InputStream inputStream = IOUtils.toInputStream(messageText, "UTF-8");
             document = reader.read(inputStream);
-            String doc = document.asXML();
             
 		    Element rootElement = document.getRootElement();
 
@@ -179,7 +164,7 @@ public class FedoraMessaging implements MessagingListener {
 			    	while (idIterator.hasNext()) {
 			    		Element id = idIterator.next();
 			    		idText = id.getText();
-						log.info("ID: " + idText);
+						log.info("Processing object: " + idText);
 			    	}
 			    	
 			    	if (idText != null) {
@@ -187,23 +172,15 @@ public class FedoraMessaging implements MessagingListener {
 			    	}
 	    		}
 	    	}	
-	    	
-//			Node elementNode = (Node) document;
-//			Element title = (Element) elementNode.selectSingleNode("entry/title");
-//		    id.addNamespace("atom", "http://www.w3.org/2005/Atom");
-//		    id.addNamespace("fedora-types", "http://www.fedora.info/definitions/1/0/types/");
-//			String titleText = title.getText();
-//			log.info("Title: " + titleText);
-	    	
         } catch(JMSException e) {
-            log.info("Error retrieving message text: " + e.getMessage());
+            log.error("Error retrieving message text: " + e.getMessage());
 	    } catch(IOException e) {
-	        log.info("Error retrieving input stream: " + e.getMessage());
+	        log.error("Error retrieving input stream: " + e.getMessage());
 	    } catch(DocumentException e) {
-	        log.info("Error parsing document: " + e.getMessage());
+	        log.error("Error parsing document: " + e.getMessage());
 	    }
         
-        log.info("Message received: " + messageText + " from client " + clientId);
+        log.info("Message received from client: " + clientId);
 	}
 
  	public void getFedoraObject(String id) {
@@ -220,9 +197,9 @@ public class FedoraMessaging implements MessagingListener {
             
             String noid = mintNoid();
             
-			File uploadObject = new File("tmp/" + fileName);
+			File uploadObject = new File(tmpDirectory + "/" + fileName);
 			
-//			writeFiles(noid, uploadObject, fileChecksum);
+			writeFiles(noid, uploadObject, fileChecksum);
 			
 			List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
 			for (DatastreamDef datastreamDef : datastreamList) {
@@ -244,23 +221,23 @@ public class FedoraMessaging implements MessagingListener {
 		            
 					File upload = new File("tmp/" + fullFilename);
 					
-					writeFiles(noid, uploadObject, fileChecksum);
+					writeFiles(noid, upload, fileChecksum);
 				}	
 			}
  		}
  		catch (Exception e) {
- 			e.printStackTrace();
+	  		log.error(e.getMessage());
  		}
 		        	
 	}	
 
  	public void writeFiles(String noid, File upload, String fileChecksum) {
  		
-// 	 	JCloudSwift jcloud = new JCloudSwift();
-   	 	
  		try {
-/*			if (jcloud.uploadObject(swiftContainer + noid, upload)) {
-				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + noid, upload.getName());
+ 	 	 	JCloudSwift jcloud = new JCloudSwift();
+ 	   	 	
+			if (jcloud.uploadObject(swiftContainer + "/" + "testobject", upload)) {
+				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo(swiftContainer + "/" + "testobject", upload.getName());
 		
 				String retrievedChecksum = checksumBytesToString(metadata.getHash());
 	
@@ -274,10 +251,13 @@ public class FedoraMessaging implements MessagingListener {
 				}
 				
 				log.info("Object copied: " + upload.getName());
-			}*/
+		 		
+		 		jcloud.close();
+		 		upload.delete();
+			}
  		}
  		catch (Exception e) {
- 			e.printStackTrace();
+	  		log.error(e.getMessage());
  		}
 	}
  	
@@ -288,7 +268,7 @@ public class FedoraMessaging implements MessagingListener {
     	try {
         	digest = MessageDigest.getInstance("MD5");
         	
-	        OutputStream outputStream = new FileOutputStream("tmp/" + id);
+	        OutputStream outputStream = new FileOutputStream(tmpDirectory + "/" + id);
 	        
 	        byte[] buffer = new byte[1024];
 	        int bytesRead = 0;
@@ -300,22 +280,12 @@ public class FedoraMessaging implements MessagingListener {
 	        inputStream.close();
 	        outputStream.flush();
 	        outputStream.close();
-	        
-/*	        InputStream digestStream = new FileInputStream("tmp/" + id);
-	        
-	        bytesRead = 0;
-	        while((bytesRead = digestStream.read(buffer)) !=-1){
-	        	digest.update(buffer, 0, bytesRead);
-	        }
-	        
-	        digestStream.close();*/
     	}    
 	    catch (IOException e) { 
 	    	log.error(e.getMessage());
-			e.printStackTrace();
 	    }
 	    catch (NoSuchAlgorithmException e) {    
-			e.printStackTrace();
+	  		log.error(e.getMessage());
 	    }
     	
     	return digest;
@@ -338,7 +308,6 @@ public class FedoraMessaging implements MessagingListener {
         } 
     	catch (IOException e){
     		 log.error(e.getMessage());
-             e.getStackTrace();
         }     
     	
     	return noid;

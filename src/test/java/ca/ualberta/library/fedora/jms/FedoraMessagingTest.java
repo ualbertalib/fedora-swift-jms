@@ -315,7 +315,6 @@ public class FedoraMessagingTest implements MessagingListener {
  	public void testGetFedoraObject() {
 		
     	String id = null;
-    	String noid = "test";
     	
     	FedoraMessaging fedoraMessaging = new FedoraMessaging();
     	
@@ -341,9 +340,10 @@ public class FedoraMessagingTest implements MessagingListener {
 			
             String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
             
-			File uploadObject = new File("tmp/" + fileName);
-			
+		
 			List <DatastreamDef> datastreamList = APIA.listDatastreams(id, null);
+			assertNotNull(datastreamList);
+			
 			for (DatastreamDef datastreamDef : datastreamList) {
 				String datastreamID = datastreamDef.getID();
 				Datastream datastream = APIM.getDatastream(id, datastreamID, null);
@@ -351,19 +351,19 @@ public class FedoraMessagingTest implements MessagingListener {
 				String controlGroupType = controlGroup.name();
 				String versionID = datastream.getVersionID();
 				
-				if (controlGroupType.equals("X")) {
+				if (controlGroupType.equals("M")) {
+					assertEquals(versionID, datastreamID + ".0");
+					assertEquals(datastream.getLabel(), "test.pdf");
+					
 					MIMETypedStream stream = APIA.getDatastreamDissemination(id, datastreamID, null);
 					DataHandler data = stream.getStream();
 					InputStream inputData = data.getInputStream();
+					assertEquals(stream.getMIMEType(), "application/pdf");
 					
 					String fullFilename = fileName + "+" + datastreamID + "+" + versionID;
 					MessageDigest digestData = fedoraMessaging.createTempFile(inputData, fullFilename);
 					
 		            fileChecksum = fedoraMessaging.checksumBytesToString(digestData.digest());
-		            
-					File upload = new File("tmp/" + fullFilename);
-					
-//					writeFiles(noid, uploadObject, fileChecksum);
 				}	
 			}
  		}
@@ -376,14 +376,12 @@ public class FedoraMessagingTest implements MessagingListener {
     @Test
  	public void writeFiles() {
 	 	
- 		String noid = "test";
- 		
     	FedoraMessaging fedoraMessaging = new FedoraMessaging();
     	
  		try {
 	    	InputStream inputObject = new FileInputStream(new File("src/test/files/ingest.xml"));
 	    	
-			MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, "ingest.xml");
+			MessageDigest digestObject = createTempFile(inputObject, "ingest.xml");
 			
 	        String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
 	        
@@ -392,17 +390,18 @@ public class FedoraMessagingTest implements MessagingListener {
 	 	 	JCloudSwift jcloud = new JCloudSwift();
 	 		assertNotNull(jcloud);
 	   	 	
-	 		    jcloud.uploadObject("era/test", upload);
-	 		    
-				MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo("era/test", upload.getName());
-		
-				String retrievedChecksum = fedoraMessaging.checksumBytesToString(metadata.getHash());
-	            
-				assertEquals(retrievedChecksum, fileChecksum);
-				
-				long retrievedLength = metadata.getBytes();
-				assertEquals(retrievedLength, upload.length());
+ 		    jcloud.uploadObject("era/test", upload);
+ 		    
+			MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo("era/test", upload.getName());
+	
+			String retrievedChecksum = fedoraMessaging.checksumBytesToString(metadata.getHash());
+            
+			assertEquals(retrievedChecksum, fileChecksum);
 			
+			long retrievedLength = metadata.getBytes();
+			assertEquals(retrievedLength, upload.length());
+			
+			upload.delete();
  		}
  		catch (Exception e) {
  			e.printStackTrace();
@@ -438,6 +437,36 @@ public class FedoraMessagingTest implements MessagingListener {
              e.getStackTrace();
         }     
     	
+    }
+    
+    public MessageDigest createTempFile(InputStream inputStream, String id) {
+       	
+    	MessageDigest digest = null;
+    	
+    	try {
+        	digest = MessageDigest.getInstance("MD5");
+        	
+	        OutputStream outputStream = new FileOutputStream("tmp/" + id);
+	        
+	        byte[] buffer = new byte[1024];
+	        int bytesRead = 0;
+	        while((bytesRead = inputStream.read(buffer)) !=-1){
+	        	outputStream.write(buffer, 0, bytesRead);
+	        	digest.update(buffer, 0, bytesRead);
+	        }
+	        
+	        inputStream.close();
+	        outputStream.flush();
+	        outputStream.close();
+    	}    
+	    catch (IOException e) { 
+	    	e.getMessage();
+	    }
+	    catch (NoSuchAlgorithmException e) {    
+	  		e.getMessage();
+	    }
+    	
+    	return digest;
     }
     
 }
