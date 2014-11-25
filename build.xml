@@ -49,7 +49,7 @@
 
 <!-- build archive -->
 <target name="archive" depends="compile">
-	<jar destfile="target/dist/fedora-swift-jms.jar" basedir="target/build/classes" manifest="manifest.txt"/>
+	<jar destfile="target/dist/fedora-swift-jms.jar" basedir="target/classes/java" manifest="manifest.txt"/>
 </target>
 
 <!-- delete builds -->
