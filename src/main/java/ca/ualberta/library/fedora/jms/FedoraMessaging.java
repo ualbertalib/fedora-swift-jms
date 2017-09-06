@@ -51,7 +51,6 @@ import org.javaswift.joss.model.Account;
 import org.javaswift.joss.model.Container;
 import org.javaswift.joss.model.StoredObject;
 
-
 public class FedoraMessaging implements MessagingListener {
 
     MessagingClient messagingClient;
@@ -116,7 +115,7 @@ public class FedoraMessaging implements MessagingListener {
         Properties swiftProperties = new Properties();
         try {
             swiftProperties.load(new FileInputStream("swift.properties"));
-            
+
             AccountConfig swiftConfig = new AccountConfig();
             swiftConfig.setUsername(swiftProperties.getProperty("identity"));
             swiftConfig.setPassword(swiftProperties.getProperty("password"));
@@ -124,7 +123,7 @@ public class FedoraMessaging implements MessagingListener {
             swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
             swiftConfig.setAuthenticationMethod(AuthenticationMethod.KEYSTONE);
             swiftAccount = new AccountFactory(swiftConfig).createAccount();
-            
+
             swiftContainer = swiftProperties.getProperty("container");
         } catch (IOException e) {
             log.error(e.getMessage());
@@ -244,25 +243,26 @@ public class FedoraMessaging implements MessagingListener {
     public void writeFiles(String noid, File upload, String fileChecksum) {
 
         try {
+            log.info("Upload Object From File" + upload.getName());
+
             Container container = swiftAccount.getContainer(swiftContainer);
             StoredObject object = container.getObject(upload.getName());
             object.uploadObject(upload);
-            object = container.getObject(upload.getName());
-            
-            if (object!=null) {
+
+            if (object.exists()) {
 
                 String retrievedChecksum = object.getEtag();
                 if (!retrievedChecksum.equals(fileChecksum)) {
                     log.error("Checksums not equal for: " + upload.getName());
                 }
-                
+
                 long retrivedLength = object.getContentLength();
                 if (retrivedLength != upload.length()) {
-                    log.error("File size does not match for: " + upload.getName());                    
+                    log.error("File size does not match for: " + upload.getName());
                 }
-                
+
                 log.info("Object copied: " + upload.getName());
-                
+
                 upload.delete();
             }
         } catch (Exception e) {
