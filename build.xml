@@ -19,15 +19,15 @@
 	<fileset dir="lib">
 		<include name="**/*.jar"/>
 	</fileset>
-	<pathelement location="target/classes" />
-	<pathelement location="src" />
+  <pathelement location="${target.classes.java.dir}"/>
+  <pathelement location="${src.dir}"/> 
 </path>
 
 <!-- compile sources -->
 <target name="compile">
 
 	<mkdir dir="${target.classes.java.dir}"/>
-	<javac destdir="${target.classes.java.dir}" encoding="UTF-8" target="1.6" source="1.6">
+	<javac destdir="${target.classes.java.dir}" encoding="UTF-8" target="1.6" source="1.6" includeantruntime="false">
 		<src path="${src.dir}"/>
 		<classpath>
 			<pathelement location="${target.classes.java.dir}"/>
@@ -58,7 +58,7 @@
 	<delete dir="${target.dir}"/>
 </target>
 
-<target name="fedora-messaging" description="Run fedora messaging">
+<target name="fedora-messaging" depends="compile"  description="Run fedora messaging">
 	<java classname="ca.ualberta.library.fedora.jms.FedoraMessaging" classpathref="build.classpath">
 		<sysproperty key="logname" value="/logs/fedora-swift-jms.log"/>
 	</java>
