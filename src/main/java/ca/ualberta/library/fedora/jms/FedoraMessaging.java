@@ -75,28 +75,7 @@ public class FedoraMessaging implements MessagingListener {
 
     public void start() throws MessagingException {
 
-        Properties jmsProperties = new Properties();
-        try {
-            jmsProperties.load(new FileInputStream("jms.properties"));
-
-            String factory = jmsProperties.getProperty("initialContextFactory");
-            String url = jmsProperties.getProperty("providerURL");
-            String factoryName = jmsProperties.getProperty("connectionFactoryName");
-            String messagingType = jmsProperties.getProperty("messagingType");
-            String activityType = jmsProperties.getProperty("activityType");
-            String messagingClientName = jmsProperties.getProperty("messagingClientName");
-
-            Properties properties = new Properties();
-            properties.setProperty(Context.INITIAL_CONTEXT_FACTORY, factory);
-            properties.setProperty(Context.PROVIDER_URL, url);
-            properties.setProperty(JMSManager.CONNECTION_FACTORY_NAME, factoryName);
-            properties.setProperty(messagingType, activityType);
-            messagingClient = new JmsMessagingClient(messagingClientName, this, properties, false);
-            messagingClient.start();
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
-
+        
         Properties clientProperties = new Properties();
         try {
             clientProperties.load(new FileInputStream("client.properties"));
@@ -126,7 +105,7 @@ public class FedoraMessaging implements MessagingListener {
 
             swiftContainer = swiftProperties.getProperty("container");
         } catch (IOException e) {
-            log.error(e.getMessage());
+            log.error("Connect to Swift: " + e.getMessage());
         }
 
         Properties noidProperties = new Properties();
@@ -140,6 +119,29 @@ public class FedoraMessaging implements MessagingListener {
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+        
+        Properties jmsProperties = new Properties();
+        try {
+            jmsProperties.load(new FileInputStream("jms.properties"));
+
+            String factory = jmsProperties.getProperty("initialContextFactory");
+            String url = jmsProperties.getProperty("providerURL");
+            String factoryName = jmsProperties.getProperty("connectionFactoryName");
+            String messagingType = jmsProperties.getProperty("messagingType");
+            String activityType = jmsProperties.getProperty("activityType");
+            String messagingClientName = jmsProperties.getProperty("messagingClientName");
+
+            Properties properties = new Properties();
+            properties.setProperty(Context.INITIAL_CONTEXT_FACTORY, factory);
+            properties.setProperty(Context.PROVIDER_URL, url);
+            properties.setProperty(JMSManager.CONNECTION_FACTORY_NAME, factoryName);
+            properties.setProperty(messagingType, activityType);
+            messagingClient = new JmsMessagingClient(messagingClientName, this, properties, false);
+            messagingClient.start();
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+
     }
 
     public void stop() throws MessagingException {

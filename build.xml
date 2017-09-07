@@ -12,6 +12,7 @@
 <property name="target.classes.java.dir" location="${target.dir}/classes/java"/>
 <property name="target.classes.test.dir" location="${target.dir}/classes/test"/>
 <property name="target.report.dir" location="${target.dir}/reports/"/>
+<property name="main-class" value="ca.ualberta.library.fedora.jms.FedoraMessaging"/>
 
 <buildnumber/>
 
@@ -50,7 +51,11 @@
 
 <!-- build archive -->
 <target name="archive" depends="compile">
-	<jar destfile="target/dist/fedora-swift-jms.jar" basedir="target/classes/java" manifest="manifest.txt"/>
+  <jar destfile="target/dist/fedora-swift-jms.jar" basedir="target/classes/java">
+    <manifest>
+      <attribute name="Main-Class" value="${main-class}"/>
+    </manifest>
+  </jar>
 </target>
 
 <!-- delete builds -->
@@ -59,9 +64,9 @@
 </target>
 
 <target name="fedora-messaging" depends="compile"  description="Run fedora messaging">
-	<java classname="ca.ualberta.library.fedora.jms.FedoraMessaging" classpathref="build.classpath">
-		<sysproperty key="logname" value="/logs/fedora-swift-jms.log"/>
-	</java>
+  <java classname="${main-class}" classpathref="build.classpath">
+    <sysproperty key="logname" value="/logs/fedora-swift-jms.log"/>
+  </java>
 </target>	
 
 <target name="test" depends="compile"> 
