@@ -59,12 +59,16 @@ import org.fcrepo.server.types.gen.RepositoryInfo;
 import org.fcrepo.server.types.mtom.gen.MIMETypedStream;
 import org.fcrepo.server.utilities.TypeUtility;
 import org.fcrepo.common.Constants;
-import org.jclouds.openstack.swift.domain.MutableObjectInfoWithMetadata;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import ca.ualberta.library.jclouds.JCloudSwift;
+import org.javaswift.joss.client.factory.AccountConfig;
+import org.javaswift.joss.client.factory.AccountFactory;
+import org.javaswift.joss.client.factory.AuthenticationMethod;
+import org.javaswift.joss.model.Account;
+import org.javaswift.joss.model.Container;
+import org.javaswift.joss.model.StoredObject;
 
 public class FedoraMessagingTest implements MessagingListener {
 
@@ -80,8 +84,12 @@ public class FedoraMessagingTest implements MessagingListener {
     private static String doc = null;
     private HttpClient client;
 
+    Properties swiftProperties = null;    
+    
     private class TopicListener implements MessageListener {
 
+        Properties swiftProperties = null;
+                
         /**
          * Casts the message to a TextMessage and displays its text. A non-text
          * message is interpreted as the end of the message stream, and the
@@ -216,11 +224,11 @@ public class FedoraMessagingTest implements MessagingListener {
             e.printStackTrace();
         }
 
-        Properties jcloudProperties = new Properties();
+        swiftProperties = new Properties();
         try {
-            jcloudProperties.load(new FileInputStream("swift.properties"));
+            swiftProperties.load(new FileInputStream("swift.properties"));
 
-            swiftContainer = jcloudProperties.getProperty("container");
+            swiftContainer = swiftProperties.getProperty("container");
             assertNotNull(swiftContainer);
         } catch (IOException e) {
             e.printStackTrace();
@@ -373,22 +381,29 @@ public class FedoraMessagingTest implements MessagingListener {
 
             MessageDigest digestObject = createTempFile(inputObject, "ingest.xml");
 
-            String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
-
             File upload = new File("src/test/files/ingest.xml");
 
-            JCloudSwift jcloud = new JCloudSwift();
-            assertNotNull(jcloud);
+            AccountConfig swiftConfig = new AccountConfig();
+            swiftConfig.setUsername(swiftProperties.getProperty("identity"));
+            swiftConfig.setPassword(swiftProperties.getProperty("password"));
+            swiftConfig.setAuthUrl(swiftProperties.getProperty("endpoint"));
+            swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
+            swiftConfig.setAuthenticationMethod(AuthenticationMethod.KEYSTONE);
+            Account swiftAccount = new AccountFactory(swiftConfig).createAccount();
+            assertNotNull(swiftAccount);
+            
+            Container container = swiftAccount.getContainer(swiftContainer);
+            assertNotNull(container);
 
-            jcloud.uploadObject("era/test", upload);
-
-            MutableObjectInfoWithMetadata metadata = jcloud.getObjectInfo("era/test", upload.getName());
-
-            String retrievedChecksum = fedoraMessaging.checksumBytesToString(metadata.getHash());
+            StoredObject object = container.getObject(upload.getName());
+            object.uploadObject(upload);
+            
+            String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
+            String retrievedChecksum = object.getEtag();
 
             assertEquals(retrievedChecksum, fileChecksum);
 
-            long retrievedLength = metadata.getBytes();
+            long retrievedLength = object.getContentLength();
             assertEquals(retrievedLength, upload.length());
 
             upload.delete();
