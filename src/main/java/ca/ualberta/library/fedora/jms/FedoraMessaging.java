@@ -51,6 +51,9 @@ import org.javaswift.joss.model.Account;
 import org.javaswift.joss.model.Container;
 import org.javaswift.joss.model.StoredObject;
 
+import ca.ualberta.library.fedora.jms.keystone_v3.KeystoneV3AccessProvider;
+
+
 public class FedoraMessaging implements MessagingListener {
 
     MessagingClient messagingClient;
@@ -100,7 +103,18 @@ public class FedoraMessaging implements MessagingListener {
             swiftConfig.setPassword(swiftProperties.getProperty("password"));
             swiftConfig.setAuthUrl(swiftProperties.getProperty("endpoint"));
             swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
-            swiftConfig.setAuthenticationMethod(AuthenticationMethod.KEYSTONE);
+            swiftConfig.setAuthenticationMethod(AuthenticationMethod.EXTERNAL);
+
+            KeystoneV3AccessProvider externalAccessProvider =
+              new KeystoneV3AccessProvider(
+                  swiftConfig.getUsername(),
+                  swiftConfig.getPassword(),
+                  swiftConfig.getAuthUrl(),
+                  "",
+                  ""
+                  );
+            swiftConfig.setAccessProvider(externalAccessProvider);
+
             swiftAccount = new AccountFactory(swiftConfig).createAccount();
 
             swiftContainer = swiftProperties.getProperty("container");

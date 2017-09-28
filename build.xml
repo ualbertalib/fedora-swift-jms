@@ -69,7 +69,7 @@
         </java>
     </target>
 
-    <target name="test" depends="compile">
+    <target name="test" depends="compile,compile.test">
         <mkdir dir="${target.report.dir}"/>
         <junit printsummary="on" haltonerror="yes" haltonfailure="yes" fork="true">
             <sysproperty key="logname" value="logs/fedora-swift-jms.log"/>
