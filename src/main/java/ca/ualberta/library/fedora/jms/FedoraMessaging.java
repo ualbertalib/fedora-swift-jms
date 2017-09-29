@@ -103,6 +103,9 @@ public class FedoraMessaging implements MessagingListener {
             swiftConfig.setPassword(swiftProperties.getProperty("password"));
             swiftConfig.setAuthUrl(swiftProperties.getProperty("endpoint"));
             swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
+
+            // External access provide for Keystone v3 support - 2017-09-27
+            // No Keystone v3 support yet in JOSS or jCloud Swift connectors
             swiftConfig.setAuthenticationMethod(AuthenticationMethod.EXTERNAL);
 
             KeystoneV3AccessProvider externalAccessProvider =
@@ -110,8 +113,8 @@ public class FedoraMessaging implements MessagingListener {
                   swiftConfig.getUsername(),
                   swiftConfig.getPassword(),
                   swiftConfig.getAuthUrl(),
-                  "",
-                  ""
+                  wiftProperties.getProperty("projectName"),
+                  wiftProperties.getProperty("domainName")
                   );
             swiftConfig.setAccessProvider(externalAccessProvider);
 

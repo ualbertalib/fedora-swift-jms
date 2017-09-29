@@ -29,6 +29,7 @@
 
         <mkdir dir="${target.classes.java.dir}"/>
         <javac destdir="${target.classes.java.dir}" encoding="UTF-8" target="1.6" source="1.6" includeantruntime="false">
+            <compilerarg value="-Xlint:unchecked"/>
             <src path="${src.dir}"/>
             <classpath>
                 <pathelement location="${target.classes.java.dir}"/>
@@ -39,7 +40,7 @@
 
     <target name="compile.test" depends="compile">
         <mkdir dir="${target.classes.test.dir}"/>
-        <javac destdir="${target.classes.test.dir}" encoding="UTF-8">
+        <javac destdir="${target.classes.test.dir}" encoding="UTF-8" includeantruntime="false">
             <src path="${src.test}"/>
             <classpath>
                 <pathelement location="${target.classes.java.dir}"/>
