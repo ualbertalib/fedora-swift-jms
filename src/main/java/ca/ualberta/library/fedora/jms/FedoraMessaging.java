@@ -113,8 +113,8 @@ public class FedoraMessaging implements MessagingListener {
                   swiftConfig.getUsername(),
                   swiftConfig.getPassword(),
                   swiftConfig.getAuthUrl(),
-                  wiftProperties.getProperty("projectName"),
-                  wiftProperties.getProperty("domainName")
+                  swiftProperties.getProperty("projectName"),
+                  swiftProperties.getProperty("domainName")
                   );
             swiftConfig.setAccessProvider(externalAccessProvider);
 

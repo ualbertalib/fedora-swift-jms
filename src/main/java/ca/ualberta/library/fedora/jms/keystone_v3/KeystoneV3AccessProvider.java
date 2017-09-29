@@ -42,7 +42,7 @@ public class KeystoneV3AccessProvider implements AccessProvider {
   private String password = null;
   private String projectId = null;
   private String authUrl = null;
-  private String domainName = null;  
+  private String userDomainName = null;  
 
   /**
    * Constructor: Keystone V3 auth
@@ -52,13 +52,13 @@ public class KeystoneV3AccessProvider implements AccessProvider {
       String password,
       String authUrl,
       String projectId,
-      String domainName) 
+      String userDomainName) 
   {
     this.username = username;
     this.password = password;
     this.authUrl = authUrl;
     this.projectId = projectId;
-    this.domainName = domainName; 
+    this.userDomainName = userDomainName; 
   }
 
   @Override
@@ -86,11 +86,34 @@ public class KeystoneV3AccessProvider implements AccessProvider {
 
     try {
       // build JSON request body for Keystone V3 authentication
-      
+      // e.g., 2017-09-29
+      // { "auth": { 
+      //     "identity": {
+      //         "methods": ["password"],
+      //         "password": {
+      //             "user": {
+      //                 "name": "demo",
+      //                 "domain": { "id": "default" },
+      //                 "password": "dem0Passw0rd"
+      //                 }
+      //             }
+      //         }
+      //     }
+      // }
+      //
+     
+
+      // domain key
+      JSONObject user_domain = new JSONObject();
+      user_domain.put("id", this.userDomainName);
+
       // user key
       JSONObject user = new JSONObject();
       user.put("id", this.username);
       user.put("password", this.password);
+      user.put("domain", user_domain);
+
+      // password key
       JSONObject password = new JSONObject();
       password.put("user", user);
 
