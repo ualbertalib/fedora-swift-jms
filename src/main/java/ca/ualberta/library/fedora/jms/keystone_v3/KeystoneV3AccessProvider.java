@@ -36,29 +36,36 @@ public class KeystoneV3AccessProvider implements AccessProvider {
   /*
   * Logger
   */
-  private static final Logger LOG = LoggerFactory .getLogger(KeystoneV3AccessProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KeystoneV3AccessProvider.class);
 
+  private String authUrl = null;
   private String username = null;
   private String password = null;
-  private String projectId = null;
-  private String authUrl = null;
-  private String userDomainName = null;  
+  private String userDomainId = null;  
+  private String projectName = null;
+  private String projectDomainId = null;  
+  private String preferredRegion = null;  
 
   /**
    * Constructor: Keystone V3 auth
    **/ 
   public KeystoneV3AccessProvider(
+      String authUrl,
       String username,
       String password,
-      String authUrl,
-      String projectId,
-      String userDomainName) 
+      String userDomainId,
+      String projectName,
+      String projectDomainId,
+      String preferredRegion
+			) 
   {
+    this.authUrl = authUrl;
     this.username = username;
     this.password = password;
-    this.authUrl = authUrl;
-    this.projectId = projectId;
-    this.userDomainName = userDomainName; 
+    this.userDomainId = userDomainId; 
+    this.projectName = projectName;
+    this.projectDomainId = projectDomainId;
+    this.preferredRegion = preferredRegion;
   }
 
   @Override
@@ -66,7 +73,7 @@ public class KeystoneV3AccessProvider implements AccessProvider {
     try {
       return keystoneV3Auth();
     } catch (IOException e) {
-      LOG.error(e.getMessage());
+      LOG.error("auth failed: " + e.getMessage());
       return null;
     }
   }
@@ -87,29 +94,37 @@ public class KeystoneV3AccessProvider implements AccessProvider {
     try {
       // build JSON request body for Keystone V3 authentication
       // e.g., 2017-09-29
-      // { "auth": { 
-      //     "identity": {
-      //         "methods": ["password"],
-      //         "password": {
-      //             "user": {
-      //                 "name": "demo",
-      //                 "domain": { "id": "default" },
-      //                 "password": "dem0Passw0rd"
-      //                 }
-      //             }
-      //         }
-      //     }
-      // }
       //
+      //{ 
+			//  "auth": {                          
+			//    "identity": {                    
+			//      "methods": ["password"],       
+			//      "password": {                  
+			//        "user": {                    
+			//          "name": "username",            
+			//          "domain": { "id": "default" },
+			//          "password": "password" 
+			//        }                            
+			//      }
+			//    }, 
+			//    "scope": {                       
+			//      "project": {                   
+			//        "name": "demo",              
+			//        "domain": { "id": "default" }
+			//      }
+			//    }
+			//  }
+			//} 
+
      
 
       // domain key
       JSONObject user_domain = new JSONObject();
-      user_domain.put("id", this.userDomainName);
+      user_domain.put("id", this.userDomainId);
 
       // user key
       JSONObject user = new JSONObject();
-      user.put("id", this.username);
+      user.put("name", this.username);
       user.put("password", this.password);
       user.put("domain", user_domain);
 
@@ -123,12 +138,15 @@ public class KeystoneV3AccessProvider implements AccessProvider {
     
       // identity key 
       JSONObject identity = new JSONObject();
-      identity.put("methods", methods);
       identity.put("password", password);
+      identity.put("methods", methods);
     
       // scope key 
+      JSONObject project_domain = new JSONObject();
+      project_domain.put("id", this.projectDomainId);
       JSONObject project = new JSONObject();
-      project.put("id", this.projectId);
+      project.put("name", this.projectName);
+      project.put("domain", project_domain);
       JSONObject scope = new JSONObject();
       scope.put("project", project);
       
@@ -139,6 +157,8 @@ public class KeystoneV3AccessProvider implements AccessProvider {
 
       JSONObject requestBody = new JSONObject();
       requestBody.put("auth", auth);
+
+      LOG.info("Swift request body: " + requestBody.toString());
 
       // connect to Keystone V3 server
       HttpURLConnection con =
@@ -154,6 +174,7 @@ public class KeystoneV3AccessProvider implements AccessProvider {
             "unexpected response code:" + status + " " + con.getResponseMessage()
             );
       }
+      LOG.info("Swift response code: " + status);
       
       // if successful, grab response
       reader = new InputStreamReader(con.getInputStream());
@@ -161,10 +182,13 @@ public class KeystoneV3AccessProvider implements AccessProvider {
       String response = bufReader.readLine();
       JSONParser parser = new JSONParser();
       JSONObject jsonResponse = (JSONObject) parser.parse(response);
+      
+      LOG.info("Swift response: " + response.toString());
 
       // parse response into Access object
       String token = con.getHeaderField("X-Subject-Token");
-      KeystoneV3Access access = new KeystoneV3Access(jsonResponse, token, "");
+      LOG.info("Swift token: " + token);
+      KeystoneV3Access access = new KeystoneV3Access(jsonResponse, token, preferredRegion);
 
       // clean-up
       con.disconnect();

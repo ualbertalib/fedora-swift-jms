@@ -86,6 +86,7 @@ public class FedoraMessaging implements MessagingListener {
             String baseURL = clientProperties.getProperty("baseURL");
             String username = clientProperties.getProperty("username");
             String password = clientProperties.getProperty("password");
+
             tmpDirectory = clientProperties.getProperty("tmpDirectory");
             FedoraClient fedoraClient = new FedoraClient(baseURL, username, password);
             APIA = fedoraClient.getAPIAMTOM();
@@ -103,6 +104,7 @@ public class FedoraMessaging implements MessagingListener {
             swiftConfig.setPassword(swiftProperties.getProperty("password"));
             swiftConfig.setAuthUrl(swiftProperties.getProperty("endpoint"));
             swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
+            swiftConfig.setPreferredRegion(swiftProperties.getProperty("preferredRegion"));
 
             // External access provide for Keystone v3 support - 2017-09-27
             // No Keystone v3 support yet in JOSS or jCloud Swift connectors
@@ -110,11 +112,13 @@ public class FedoraMessaging implements MessagingListener {
 
             KeystoneV3AccessProvider externalAccessProvider =
               new KeystoneV3AccessProvider(
+                  swiftConfig.getAuthUrl(),
                   swiftConfig.getUsername(),
                   swiftConfig.getPassword(),
-                  swiftConfig.getAuthUrl(),
+                  swiftProperties.getProperty("userDomainId"),
                   swiftProperties.getProperty("projectName"),
-                  swiftProperties.getProperty("domainName")
+                  swiftProperties.getProperty("projectDomainId"),
+                  swiftConfig.getPreferredRegion()
                   );
             swiftConfig.setAccessProvider(externalAccessProvider);
 
@@ -216,17 +220,18 @@ public class FedoraMessaging implements MessagingListener {
 
         try {
             String fileName = id.substring(id.lastIndexOf(":") + 1);
+            String tmpFileName = tmpDirectory + "/" + fileName;
 
             DataHandler object = APIM.getObjectXML(id);
             InputStream inputObject = object.getInputStream();
 
-            MessageDigest digestObject = createTempFile(inputObject, fileName);
+            MessageDigest digestObject = createTempFile(inputObject, tmpFileName);
 
             String fileChecksum = checksumBytesToString(digestObject.digest());
 
             String noid = mintNoid();
 
-            File uploadObject = new File(tmpDirectory + "/" + fileName);
+            File uploadObject = new File(tmpFileName);
 
             writeFiles(noid, uploadObject, fileChecksum);
 
@@ -244,11 +249,12 @@ public class FedoraMessaging implements MessagingListener {
                     InputStream inputData = data.getInputStream();
 
                     String fullFilename = fileName + "+" + datastreamID + "+" + versionID;
-                    MessageDigest digestData = createTempFile(inputData, fullFilename);
+                    String tmpFullFilename = tmpDirectory + "/" + fullFilename;
+                    MessageDigest digestData = createTempFile(inputData, tmpFullFilename);
 
                     fileChecksum = checksumBytesToString(digestData.digest());
 
-                    File upload = new File("tmp/" + fullFilename);
+                    File upload = new File(tmpFullFilename);
 
                     writeFiles(noid, upload, fileChecksum);
                 }
@@ -289,6 +295,29 @@ public class FedoraMessaging implements MessagingListener {
         }
     }
 
+    public String getFileChecksum(MessageDigest digest, File upload) throws IOException {
+
+				StringBuilder sb = null; 
+				String ret = null;
+        try {
+            FileInputStream inputStream = new FileInputStream(upload);
+            byte[] buffer = new byte[1024];
+            int bytesRead = 0;
+
+						while ((bytesRead = inputStream.read(buffer)) != -1) {
+								digest.update(buffer, 0, bytesRead);
+						};
+						inputStream.close();
+						
+						//Get the hash's bytes
+						byte[] bytes = digest.digest();
+						ret = checksumBytesToString(bytes);
+        } catch (IOException e) {
+            log.error(e.getMessage());
+				}
+			  return ret;
+    }
+
     public MessageDigest createTempFile(InputStream inputStream, String id) {
 
         MessageDigest digest = null;
@@ -296,7 +325,7 @@ public class FedoraMessaging implements MessagingListener {
         try {
             digest = MessageDigest.getInstance("MD5");
 
-            OutputStream outputStream = new FileOutputStream(tmpDirectory + "/" + id);
+            OutputStream outputStream = new FileOutputStream(id);
 
             byte[] buffer = new byte[1024];
             int bytesRead = 0;
@@ -364,4 +393,9 @@ public class FedoraMessaging implements MessagingListener {
 
         return hexString.toString();
     }
+
+    public void setTmpDirectory(String s) {
+      this.tmpDirectory = s;
+    }
+
 }

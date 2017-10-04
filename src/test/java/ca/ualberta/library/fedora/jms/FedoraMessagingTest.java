@@ -82,6 +82,7 @@ public class FedoraMessagingTest implements MessagingListener {
     private static FedoraAPIAMTOM APIA = null;
     private static FedoraAPIMMTOM APIM = null;
     private String swiftContainer = null;
+    private String tmpDirectory = "tmp";                                            
     private String noidURL = null;
     private static String doc = null;
     private HttpClient client;
@@ -90,8 +91,6 @@ public class FedoraMessagingTest implements MessagingListener {
     
     private class TopicListener implements MessageListener {
 
-        Properties swiftProperties = null;
-                
         /**
          * Casts the message to a TextMessage and displays its text. A non-text
          * message is interpreted as the end of the message stream, and the
@@ -205,6 +204,8 @@ public class FedoraMessagingTest implements MessagingListener {
             String password = clientProperties.getProperty("password");
             assertNotNull(password);
 
+            tmpDirectory = clientProperties.getProperty("tmpDirectory");           
+
             FedoraClient fedoraClient = new FedoraClient(baseURL, "fedoraAdmin", "fedoraAdmin");
             FedoraAPIA fedoraAPIA = fedoraClient.getAPIA();
             RepositoryInfo repositoryInfo = fedoraAPIA.describeRepository();
@@ -212,11 +213,13 @@ public class FedoraMessagingTest implements MessagingListener {
             assertEquals(version, "3.7.0");
 
             APIA = fedoraClient.getAPIAMTOM();
+            assertNotNull(APIA);
             repositoryInfo = APIA.describeRepository();
             version = repositoryInfo.getRepositoryVersion();
             assertEquals(version, "3.7.0");
 
             APIM = fedoraClient.getAPIMMTOM();
+            assertNotNull(APIM);
             repositoryInfo = APIA.describeRepository();
             version = repositoryInfo.getRepositoryVersion();
             assertEquals(version, "3.7.0");
@@ -232,6 +235,17 @@ public class FedoraMessagingTest implements MessagingListener {
 
             swiftContainer = swiftProperties.getProperty("container");
             assertNotNull(swiftContainer);
+
+            String tmp = null;
+            tmp = swiftProperties.getProperty("identity");
+            assertNotNull(tmp);
+            
+            tmp = swiftProperties.getProperty("password");
+            assertNotNull(tmp);
+            
+            tmp = swiftProperties.getProperty("endpoint");
+            assertNotNull(tmp);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -324,6 +338,7 @@ public class FedoraMessagingTest implements MessagingListener {
         try {
             InputStream is = new FileInputStream(new File("src/test/files/ingest.xml"));
             byte[] bytes = IOUtils.toByteArray(is);
+            assertNotNull(APIM);
             id = APIM.ingest(TypeUtility.convertBytesToDataHandler(bytes), Constants.FOXML1_1.uri, "ingesting new foxml object");
         } catch (IOException e) {
             e.getMessage();
@@ -338,7 +353,8 @@ public class FedoraMessagingTest implements MessagingListener {
 
             InputStream inputObject = object.getInputStream();
 
-            MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, fileName);
+            String tmpFileName = this.tmpDirectory + "/" + fileName;
+            MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, tmpFileName);
 
             String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
 
@@ -378,50 +394,69 @@ public class FedoraMessagingTest implements MessagingListener {
 
         FedoraMessaging fedoraMessaging = new FedoraMessaging();
 
+        String testFileName = "ingest.xml";
+        String testFilePath = "src/test/files/"+testFileName;
+
         try {
-            InputStream inputObject = new FileInputStream(new File("src/test/files/ingest.xml"));
 
-            MessageDigest digestObject = createTempFile(inputObject, "ingest.xml");
+            InputStream inputObject = new FileInputStream(new File(testFilePath));
+            String tmpDirectory = "tmp";
+            String tmpFileName = tmpDirectory + "/" + testFileName;
+            File dir = new File(tmpDirectory);
+            dir.mkdir();
+            MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, tmpFileName);
+            File upload = new File(tmpFileName);
 
-            File upload = new File("src/test/files/ingest.xml");
+            swiftProperties = new Properties();
+            swiftProperties.load(new FileInputStream("swift.properties"));
+            assertNotNull(swiftProperties);
 
             AccountConfig swiftConfig = new AccountConfig();
             swiftConfig.setUsername(swiftProperties.getProperty("identity"));
             swiftConfig.setPassword(swiftProperties.getProperty("password"));
             swiftConfig.setAuthUrl(swiftProperties.getProperty("endpoint"));
             swiftConfig.setTenantName(swiftProperties.getProperty("tenant"));
+            swiftConfig.setPreferredRegion(swiftProperties.getProperty("preferredRegion"));
 
 						swiftConfig.setAuthenticationMethod(AuthenticationMethod.EXTERNAL);
  
             KeystoneV3AccessProvider externalAccessProvider =
               new KeystoneV3AccessProvider(
+                  swiftConfig.getAuthUrl(),
                   swiftConfig.getUsername(),
                   swiftConfig.getPassword(),
-                  swiftConfig.getAuthUrl(),
-                  "",
-                  ""
+                  swiftProperties.getProperty("userDomainId"),    
+                  swiftProperties.getProperty("projectName"),     
+                  swiftProperties.getProperty("projectDomainId"),
+                  swiftConfig.getPreferredRegion()
                   );
             swiftConfig.setAccessProvider(externalAccessProvider);
-
 
             Account swiftAccount = new AccountFactory(swiftConfig).createAccount();
             assertNotNull(swiftAccount);
             
+            swiftContainer = swiftProperties.getProperty("container");
+            assertNotNull(swiftContainer);
+
             Container container = swiftAccount.getContainer(swiftContainer);
             assertNotNull(container);
 
             StoredObject object = container.getObject(upload.getName());
-            object.uploadObject(upload);
-            
-            String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
-            String retrievedChecksum = object.getEtag();
+            assertNotNull(object);
 
+            object.uploadObject(upload);
+            assertNotNull(object.getPublicURL());
+            
+            String retrievedChecksum = object.getEtag();
+            assertNotNull(retrievedChecksum);
+            String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
             assertEquals(retrievedChecksum, fileChecksum);
 
             long retrievedLength = object.getContentLength();
             assertEquals(retrievedLength, upload.length());
 
             upload.delete();
+            dir.delete();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -483,5 +518,4 @@ public class FedoraMessagingTest implements MessagingListener {
 
         return digest;
     }
-
 }

@@ -91,6 +91,9 @@ public class KeystoneV3Access implements Access {
         }
       }
     }
+
+    LOG.info("Swift public URL: " + this.publicURL);                   
+    LOG.info("Swift internal URL: " + this.internalURL);                   
   }
 
   @Override
