@@ -82,7 +82,7 @@ public class FedoraMessagingTest implements MessagingListener {
     private static FedoraAPIAMTOM APIA = null;
     private static FedoraAPIMMTOM APIM = null;
     private String swiftContainer = null;
-    private String tmpDirectory = "tmp";                                            
+    private static String tmpDirectory = "tmp";                                            
     private String noidURL = null;
     private static String doc = null;
     private HttpClient client;
@@ -136,6 +136,46 @@ public class FedoraMessagingTest implements MessagingListener {
             e.getMessage();
         }
 
+
+        Properties clientProperties = new Properties();
+        try {
+            clientProperties.load(new FileInputStream("client.properties"));
+            String baseURL = clientProperties.getProperty("baseURL");
+            assertNotNull(baseURL);
+
+            String username = clientProperties.getProperty("username");
+            assertNotNull(username);
+
+            String password = clientProperties.getProperty("password");
+            assertNotNull(password);
+
+            tmpDirectory = clientProperties.getProperty("tmpDirectory");           
+
+            FedoraClient fedoraClient = new FedoraClient(baseURL, "fedoraAdmin", "fedoraAdmin");
+            FedoraAPIA fedoraAPIA = fedoraClient.getAPIA();
+            RepositoryInfo repositoryInfo = fedoraAPIA.describeRepository();
+            String version = repositoryInfo.getRepositoryVersion();
+            assertEquals(version, "3.7.0");
+
+            APIA = fedoraClient.getAPIAMTOM();
+            assertNotNull(APIA);
+            repositoryInfo = APIA.describeRepository();
+            version = repositoryInfo.getRepositoryVersion();
+            assertEquals(version, "3.7.0");
+
+            APIM = fedoraClient.getAPIMMTOM();
+            assertNotNull(APIM);
+            repositoryInfo = APIA.describeRepository();
+            version = repositoryInfo.getRepositoryVersion();
+            assertEquals(version, "3.7.0");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ServiceException e) {
+            e.printStackTrace();
+        }
+
+
+
     }
 
     @AfterClass
@@ -188,44 +228,6 @@ public class FedoraMessagingTest implements MessagingListener {
             assertNotNull(messagingClient);
 
         } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        Properties clientProperties = new Properties();
-        try {
-            clientProperties.load(new FileInputStream("client.properties"));
-
-            String baseURL = clientProperties.getProperty("baseURL");
-            assertNotNull(baseURL);
-
-            String username = clientProperties.getProperty("username");
-            assertNotNull(username);
-
-            String password = clientProperties.getProperty("password");
-            assertNotNull(password);
-
-            tmpDirectory = clientProperties.getProperty("tmpDirectory");           
-
-            FedoraClient fedoraClient = new FedoraClient(baseURL, "fedoraAdmin", "fedoraAdmin");
-            FedoraAPIA fedoraAPIA = fedoraClient.getAPIA();
-            RepositoryInfo repositoryInfo = fedoraAPIA.describeRepository();
-            String version = repositoryInfo.getRepositoryVersion();
-            assertEquals(version, "3.7.0");
-
-            APIA = fedoraClient.getAPIAMTOM();
-            assertNotNull(APIA);
-            repositoryInfo = APIA.describeRepository();
-            version = repositoryInfo.getRepositoryVersion();
-            assertEquals(version, "3.7.0");
-
-            APIM = fedoraClient.getAPIMMTOM();
-            assertNotNull(APIM);
-            repositoryInfo = APIA.describeRepository();
-            version = repositoryInfo.getRepositoryVersion();
-            assertEquals(version, "3.7.0");
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ServiceException e) {
             e.printStackTrace();
         }
 
@@ -354,6 +356,9 @@ public class FedoraMessagingTest implements MessagingListener {
             InputStream inputObject = object.getInputStream();
 
             String tmpFileName = this.tmpDirectory + "/" + fileName;
+            File dir = new File(tmpDirectory);
+            dir.mkdir();
+
             MessageDigest digestObject = fedoraMessaging.createTempFile(inputObject, tmpFileName);
 
             String fileChecksum = fedoraMessaging.checksumBytesToString(digestObject.digest());
@@ -378,7 +383,8 @@ public class FedoraMessagingTest implements MessagingListener {
                     assertEquals(stream.getMIMEType(), "application/pdf");
 
                     String fullFilename = fileName + "+" + datastreamID + "+" + versionID;
-                    MessageDigest digestData = fedoraMessaging.createTempFile(inputData, fullFilename);
+                    String tmpFullFilename = this.tmpDirectory + "/" + fullFilename;
+                    MessageDigest digestData = fedoraMessaging.createTempFile(inputData, tmpFullFilename);
 
                     fileChecksum = fedoraMessaging.checksumBytesToString(digestData.digest());
                 }
