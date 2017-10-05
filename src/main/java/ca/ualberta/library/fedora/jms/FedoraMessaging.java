@@ -78,7 +78,6 @@ public class FedoraMessaging implements MessagingListener {
 
     public void start() throws MessagingException {
 
-        
         Properties clientProperties = new Properties();
         try {
             clientProperties.load(new FileInputStream("client.properties"));
@@ -87,12 +86,17 @@ public class FedoraMessaging implements MessagingListener {
             String username = clientProperties.getProperty("username");
             String password = clientProperties.getProperty("password");
 
+
             tmpDirectory = clientProperties.getProperty("tmpDirectory");
+            
             FedoraClient fedoraClient = new FedoraClient(baseURL, username, password);
+            log.debug("Connect to Fedora: " + baseURL + " " + username + " " + password + " " + tmpDirectory);
+
             APIA = fedoraClient.getAPIAMTOM();
             APIM = fedoraClient.getAPIMMTOM();
+            
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("Connect to Fedora: " + e.getMessage());
         }
 
         Properties swiftProperties = new Properties();

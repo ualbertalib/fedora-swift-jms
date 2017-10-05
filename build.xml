@@ -67,6 +67,11 @@
     <target name="fedora-messaging" depends="compile"  description="Run fedora messaging">
         <java classname="${main-class}" classpathref="build.classpath">
             <sysproperty key="logname" value="/logs/fedora-swift-jms.log"/>
+            <classpath>
+                <pathelement location="${target.classes.java.dir}"/>
+                <pathelement location="${target.classes.test.dir}"/>
+                <path refid="build.classpath"/>
+            </classpath>
         </java>
     </target>
 
